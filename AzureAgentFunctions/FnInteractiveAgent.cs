@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging;
 using System.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Azure.Functions.Worker.Http;
+using AzureAgentFunctions.EasyAuthHelpers;
+using System.Text.Json;
 
 namespace AzureAgentFunctions;
 
@@ -18,22 +20,60 @@ public class FnInteractiveAgent
     [Function("FnInteractiveAgent")]
     [Authorize]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Function, "get", "post")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req)
     {
-        _logger.LogInformation("C# HTTP trigger function processed a request.");
-        _logger.LogInformation("User authenticated: {UserId}", req.Identities.FirstOrDefault()?.Name);
+ 
+       _logger.LogInformation("EchoAuthArtifacts invoked.");
 
-        // Create successful response
-        var response = req.CreateResponse(HttpStatusCode.OK);
-        response.Headers.Add("Content-Type", "application/json; charset=utf-8");
-        
-        var responseData = new
+        // 1) Get original tokens (if Easy Auth is configured to provide them)
+        //    Common header names for Entra ID; add others if you support more providers.
+        req.Headers.TryGetValues("X-MS-TOKEN-AAD-ACCESS-TOKEN", out var accessTokenValues);
+        req.Headers.TryGetValues("X-MS-TOKEN-AAD-ID-TOKEN", out var idTokenValues);
+
+        string? accessToken = accessTokenValues?.FirstOrDefault();
+        string? idToken = idTokenValues?.FirstOrDefault();
+
+        // 2) Get the Easy Auth client principal header and convert to ClaimsPrincipal
+        req.Headers.TryGetValues("X-MS-CLIENT-PRINCIPAL", out var principalHeaderValues);
+        var principalHeader = principalHeaderValues?.FirstOrDefault();
+
+        var principal = EasyAuthPrincipal.FromBase64Header(principalHeader);
+
+        // 3) Prepare a safe response (truncate tokens so we don't echo secrets in full)
+        string Truncate(string? s, int keep = 24)
+            => string.IsNullOrEmpty(s) ? null! : (s.Length <= keep ? s : s.Substring(0, keep) + "...");
+
+        var details = new
         {
-            message = "Welcome to Azure Functions!",
-            name = req.FunctionContext.GetHttpContext()?.User?.Identity?.Name,
-            isAuthN = req.FunctionContext.GetHttpContext()?.User?.Identity?.IsAuthenticated
+            message = "Easy Auth artifacts echoed.",
+            // Tokens (truncated for safety)
+            accessTokenStartsWith = Truncate(accessToken),
+            idTokenStartsWith = Truncate(idToken),
+
+            // Principal basics
+            isAuthenticated = principal?.Identity?.IsAuthenticated ?? false,
+            name = principal?.Identity?.Name,
+            authenticationType = principal?.Identity?.AuthenticationType,
+
+            // Useful identifiers (if present)
+            oid = principal?.Claims.FirstOrDefault(c => c.Type == "oid")?.Value,
+            tid = principal?.Claims.FirstOrDefault(c => c.Type == "tid")?.Value,
+            sub = principal?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value,
+
+            // Scopes/Roles
+            scopes = principal?.Claims.Where(c => c.Type == "scp").Select(c => c.Value).ToArray(),
+            roles = principal?.Claims.Where(c => c.Type == "roles").Select(c => c.Value).ToArray(),
+
+            // All claims (type + value) for debugging
+            claims = principal?.Claims.Select(c => new { c.Type, c.Value }).ToArray()
         };
-        await response.WriteStringAsync(System.Text.Json.JsonSerializer.Serialize(responseData));
-        return response;
+
+        var res = req.CreateResponse(HttpStatusCode.OK);
+        res.Headers.Add("Content-Type", "application/json; charset=utf-8");
+        await res.WriteStringAsync(JsonSerializer.Serialize(details, new JsonSerializerOptions
+        {
+            WriteIndented = true
+        }));
+        return res;
     }
 }
