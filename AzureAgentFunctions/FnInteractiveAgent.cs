@@ -29,9 +29,11 @@ public class FnInteractiveAgent
         //    Common header names for Entra ID; add others if you support more providers.
         req.Headers.TryGetValues("X-MS-TOKEN-AAD-ACCESS-TOKEN", out var accessTokenValues);
         req.Headers.TryGetValues("X-MS-TOKEN-AAD-ID-TOKEN", out var idTokenValues);
+        req.Headers.TryGetValues("Authorization", out var authValues);
 
         string? accessToken = accessTokenValues?.FirstOrDefault();
         string? idToken = idTokenValues?.FirstOrDefault();
+        string? authToken = authValues?.FirstOrDefault();
 
         // 2) Get the Easy Auth client principal header and convert to ClaimsPrincipal
         req.Headers.TryGetValues("X-MS-CLIENT-PRINCIPAL", out var principalHeaderValues);
@@ -40,7 +42,7 @@ public class FnInteractiveAgent
         var principal = EasyAuthPrincipal.FromBase64Header(principalHeader);
 
         // 3) Prepare a safe response (truncate tokens so we don't echo secrets in full)
-        string Truncate(string? s, int keep = 24)
+        string Truncate(string? s, int keep = 48)
             => string.IsNullOrEmpty(s) ? null! : (s.Length <= keep ? s : s.Substring(0, keep) + "...");
 
         var details = new
@@ -49,7 +51,7 @@ public class FnInteractiveAgent
             // Tokens (truncated for safety)
             accessTokenStartsWith = Truncate(accessToken),
             idTokenStartsWith = Truncate(idToken),
-
+            authTokenStartsWith = Truncate(authToken),
             // Principal basics
             isAuthenticated = principal?.Identity?.IsAuthenticated ?? false,
             name = principal?.Identity?.Name,
