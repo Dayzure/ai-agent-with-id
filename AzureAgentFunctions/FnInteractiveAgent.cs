@@ -43,12 +43,7 @@ public class FnInteractiveAgent
             isAuthenticated = principal.Identity.IsAuthenticated,
             name = principal.Claims.FirstOrDefault(c => c.Type == "name")?.Value,
             authenticationType = principal.Identity.AuthenticationType,
-
-            // Useful identifiers (if present)
-            oid = principal?.Claims.FirstOrDefault(c => c.Type == "oid")?.Value,
-            tid = principal?.Claims.FirstOrDefault(c => c.Type == "tid")?.Value,
-            sub = principal?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value,
-
+            
             // Scopes/Roles
             scopes = principal?.Claims.Where(c => c.Type == "scp").Select(c => c.Value).ToArray(),
             roles = principal?.Claims.Where(c => c.Type == "roles").Select(c => c.Value).ToArray(),

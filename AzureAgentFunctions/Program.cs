@@ -2,28 +2,32 @@ using DigitalWorkerWithTools.Authentication;
 using DigitalWorkerWithTools.Tools;
 using DigitialWorkerWithTools.Authentication;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Identity.Web;
 
-var builder = FunctionsApplication.CreateBuilder(args);
-
-builder.ConfigureFunctionsWebApplication();
-
-builder.Services
-    .AddMicrosoftIdentityWebApiAuthentication(builder.Configuration.GetSection("AzureAD"));
-
-builder.Services
-    .AddApplicationInsightsTelemetryWorkerService()
-    .ConfigureFunctionsApplicationInsights()
-    .AddSingleton<FicTokenCredential>()
-    .AddSingleton(serviceProvider =>
-        {
-            var tokenCredential = serviceProvider.GetRequiredService<FicTokenCredential>();
-            return new MsGraphTools(tokenCredential);
-        })
-    .Configure<AgentIdSettings>(builder.Configuration.GetSection("AgentId"))
-    .Configure<AzureAdSettings>(builder.Configuration.GetSection("AzureAD"));
-
-builder.Build().Run();
+var host = new HostBuilder()
+    .ConfigureFunctionsWebApplication() // Sets up the isolated worker pipeline   
+    .ConfigureAppConfiguration(config =>
+    {
+        // Optional: Add additional configuration sources
+        config.AddJsonFile("local.appsettings.json", optional: true, reloadOnChange: true);
+        config.AddEnvironmentVariables();
+    })
+    .ConfigureServices((context, services) =>
+    {
+        services.AddMicrosoftIdentityWebApiAuthentication(context.Configuration, "AzureAD");       
+        services.AddApplicationInsightsTelemetryWorkerService()
+            .ConfigureFunctionsApplicationInsights()
+            .AddSingleton<FicTokenCredential>()
+            .AddSingleton(serviceProvider =>
+            {
+                var tokenCredential = serviceProvider.GetRequiredService<FicTokenCredential>();
+                return new MsGraphTools(tokenCredential);
+            })
+            .Configure<AgentIdSettings>(context.Configuration.GetSection("AgentId"))
+            .Configure<AzureAdSettings>(context.Configuration.GetSection("AzureAD"));
+    })
+    .Build();
+host.Run();
