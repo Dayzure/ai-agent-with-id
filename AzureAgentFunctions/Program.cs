@@ -12,7 +12,7 @@ var builder = FunctionsApplication.CreateBuilder(args);
 builder.ConfigureFunctionsWebApplication();
 
 builder.Services
-    .AddMicrosoftIdentityWebApiAuthentication(builder.Configuration.GetSection("AiAzureAD"));
+    .AddMicrosoftIdentityWebApiAuthentication(builder.Configuration.GetSection("AzureAD"));
 
 builder.Services
     .AddApplicationInsightsTelemetryWorkerService()

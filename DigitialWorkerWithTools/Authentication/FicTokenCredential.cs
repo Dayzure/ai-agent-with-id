@@ -15,7 +15,7 @@ public class FicTokenCredential : TokenCredential
 {
     private readonly AgentIdSettings _agentIdSettings;
     private readonly AzureAdSettings _azureAdSettings;
-    private string[] _scopes = new[] { "api://AzureADTokenExchange/.default" };
+    private string[] _scopes = ["api://AzureADTokenExchange/.default"];
     private IConfidentialClientApplication _app;
     private IConfidentialClientApplication _agentIdApp;
     private readonly HttpClient _httpClient = new HttpClient();
@@ -101,7 +101,7 @@ public class FicTokenCredential : TokenCredential
             $"https://login.microsoftonline.com/{_azureAdSettings.TenantId}/oauth2/v2.0/token");
 
         string blueprintFicToken = await GetBlueprintAssertion();
-        string agentIdFicToken = await GetAgentIdToken(new[] { "api://AzureADTokenExchange/.default" });
+        string agentIdFicToken = await GetAgentIdToken(_scopes);
 
         var content = new FormUrlEncodedContent(new[]
         {
@@ -134,7 +134,7 @@ public class FicTokenCredential : TokenCredential
         });
 
         // Example: Get token for Microsoft Graph
-        var token = credential.GetToken(
+        var token = await credential.GetTokenAsync(
             new TokenRequestContext(_scopes)
         );
         string accessToken = token.Token;
