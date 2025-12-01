@@ -148,7 +148,7 @@ Repeat for all chats and emails with new activity.
         _agent = new AzureOpenAIClient(
             new Uri(ai_endpoint),
                 credential)
-                .GetChatClient("gpt-4.1-nano")
+                .GetChatClient("gpt-4o")
                 .CreateAIAgent(instructions: sysPrompt,
                 tools: [AIFunctionFactory.Create(tools.GetAgentDetailsAsync),
                     AIFunctionFactory.Create(tools.GetTeamsChatsAsync),
